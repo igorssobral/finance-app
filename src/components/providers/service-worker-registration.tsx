@@ -1,0 +1,15 @@
+"use client";
+
+import * as React from "react";
+
+export function ServiceWorkerRegistration() {
+  React.useEffect(() => {
+    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Falha silenciosa: PWA é um extra, não deve quebrar a aplicação
+      });
+    }
+  }, []);
+
+  return null;
+}

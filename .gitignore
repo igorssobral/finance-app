@@ -1,0 +1,20 @@
+node_modules
+# Keep environment variables out of version control
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# Local agent/editor configuration folders
+.agents/
+.claude/
+
+# Next.js build output
+.next/
+
+# Local Windsurf editor state
+.windsurf/
+
+/generated/prisma

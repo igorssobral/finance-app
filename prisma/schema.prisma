@@ -1,0 +1,469 @@
+// ============================================================================
+// Finance App — Prisma Schema
+// PostgreSQL · relacionamentos com cascade · índices em colunas de busca/filtro
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  USER
+  GUEST
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum AccountType {
+  CHECKING // Conta Corrente
+  SAVINGS // Conta Poupança
+  WALLET // Carteira
+  CASH // Dinheiro
+  DIGITAL // Conta Digital
+}
+
+enum CardBrand {
+  VISA
+  MASTERCARD
+  ELO
+  AMEX
+  HIPERCARD
+  OTHER
+}
+
+enum InvestmentType {
+  TREASURY // Tesouro Direto
+  CDB
+  STOCK // Ações
+  ETF
+  REIT // FIIs
+  CRYPTO
+  FUND
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  ACHIEVED
+  ARCHIVED
+}
+
+enum BudgetPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum RecurrenceFrequency {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum ImportSource {
+  OFX
+  CSV
+  XLSX
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSED
+  RECONCILED
+  FAILED
+}
+
+enum NotificationType {
+  BILL_DUE
+  CARD_INVOICE
+  GOAL_PROGRESS
+  BUDGET_EXCEEDED
+  INSIGHT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+// ----------------------------------------------------------------------------
+// Autenticação / Usuário / Família
+// ----------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  image         String?
+  role          Role      @default(USER)
+
+  currency String @default("BRL")
+  locale   String @default("pt-BR")
+  timezone String @default("America/Sao_Paulo")
+  theme    String @default("system") // light | dark | system
+
+  householdId String?
+  household   Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+
+  accounts      Account[]
+  cards         Card[]
+  categories    Category[]
+  transactions  Transaction[]
+  goals         Goal[]
+  investments   Investment[]
+  budgets       Budget[]
+  subscriptions RecurringSubscription[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  importBatches ImportBatch[]
+  sessions      Session[]
+  accountsAuth  AuthAccount[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([householdId])
+}
+
+/// Controle financeiro compartilhado entre membros da família
+model Household {
+  id      String @id @default(cuid())
+  name    String
+  members User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Modelos padrão do Auth.js (NextAuth v5) com Prisma Adapter
+model AuthAccount {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts_auth")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ----------------------------------------------------------------------------
+// Contas e Cartões
+// ----------------------------------------------------------------------------
+
+model Account {
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  type           AccountType
+  bank           String?
+  color          String      @default("#10b981")
+  icon           String      @default("wallet")
+  initialBalance Decimal     @default(0) @db.Decimal(14, 2)
+  archived       Boolean     @default(false)
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Card {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  brand           CardBrand
+  limit           Decimal   @db.Decimal(14, 2)
+  closingDay      Int // dia de fechamento da fatura
+  dueDay          Int // dia de vencimento
+  color           String    @default("#3b82f6")
+  archived        Boolean   @default(false)
+
+  transactions Transaction[]
+  installments Installment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// Categorias
+// ----------------------------------------------------------------------------
+
+model Category {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  color         String   @default("#71717a")
+  icon          String   @default("shapes")
+  monthlyBudget Decimal? @db.Decimal(14, 2)
+  isDefault     Boolean  @default(false)
+
+  transactions Transaction[]
+  budgets      Budget[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// Transações / Parcelamentos / Assinaturas
+// ----------------------------------------------------------------------------
+
+model Transaction {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  amount      Decimal         @db.Decimal(14, 2)
+  type        TransactionType
+  date        DateTime
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  cardId String?
+  card   Card?   @relation(fields: [cardId], references: [id], onDelete: SetNull)
+
+  isRecurring Boolean @default(false)
+  isInstallment Boolean @default(false)
+
+  installmentId String?
+  installment   Installment? @relation(fields: [installmentId], references: [id], onDelete: SetNull)
+
+  subscriptionId String?
+  subscription   RecurringSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  attachments Attachment[]
+  notes       String?
+
+  // Preenchido pela IA de categorização automática, mantendo rastreabilidade
+  aiCategorized Boolean @default(false)
+  aiConfidence  Decimal? @db.Decimal(4, 3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, type])
+  @@index([categoryId])
+  @@index([accountId])
+  @@index([cardId])
+}
+
+model Attachment {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  url           String
+  fileName      String
+  mimeType      String
+  // Texto extraído via OCR do comprovante/nota fiscal
+  ocrText       String?     @db.Text
+  createdAt     DateTime    @default(now())
+
+  @@index([transactionId])
+}
+
+/// Compra parcelada (ex.: Notebook 12x R$450)
+model Installment {
+  id            String   @id @default(cuid())
+  cardId        String
+  card          Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  title         String
+  totalAmount   Decimal  @db.Decimal(14, 2)
+  totalCount    Int // total de parcelas
+  paidCount     Int      @default(0)
+  installmentAmount Decimal @db.Decimal(14, 2)
+  firstDueDate  DateTime
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([cardId])
+}
+
+/// Assinaturas recorrentes (Netflix, Spotify etc.)
+model RecurringSubscription {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  amount    Decimal             @db.Decimal(14, 2)
+  frequency RecurrenceFrequency
+  nextChargeDate DateTime
+  active    Boolean             @default(true)
+  icon      String              @default("repeat")
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// Metas / Orçamentos / Investimentos
+// ----------------------------------------------------------------------------
+
+model Goal {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  targetAmount  Decimal    @db.Decimal(14, 2)
+  currentAmount Decimal    @default(0) @db.Decimal(14, 2)
+  targetDate    DateTime?
+  status        GoalStatus @default(IN_PROGRESS)
+  color         String     @default("#10b981")
+  icon          String     @default("target")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Budget {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  limit      Decimal      @db.Decimal(14, 2)
+  period     BudgetPeriod @default(MONTHLY)
+  alertAt    Int          @default(90) // % do limite que dispara alerta
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, categoryId, period])
+  @@index([userId])
+}
+
+model Investment {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  type          InvestmentType
+  investedAmount Decimal       @db.Decimal(14, 2)
+  currentAmount Decimal        @db.Decimal(14, 2)
+  quantity      Decimal?       @db.Decimal(18, 8) // para ações/cripto/ETF/FII
+  broker        String?
+  purchaseDate  DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, type])
+}
+
+// ----------------------------------------------------------------------------
+// Importação de extratos / Auditoria / Notificações
+// ----------------------------------------------------------------------------
+
+model ImportBatch {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source    ImportSource
+  fileName  String
+  status    ImportStatus @default(PENDING)
+  rowCount  Int          @default(0)
+  errorLog  String?      @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Notification {
+  id      String            @id @default(cuid())
+  userId  String
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    NotificationType
+  title   String
+  message String
+  read    Boolean           @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entity     String // ex: "Transaction", "Category"
+  entityId   String
+  action     AuditAction
+  before     Json?
+  after      Json?
+  createdAt  DateTime    @default(now())
+
+  @@index([userId, entity])
+  @@index([entityId])
+}

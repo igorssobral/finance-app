@@ -44,6 +44,8 @@ export function CategoryPieChart({ data }: { data: DataPoint[] }) {
             borderRadius: 8,
             fontSize: 12,
           }}
+          labelStyle={{ color: "hsl(var(--foreground))" }}
+          itemStyle={{ color: "hsl(var(--foreground))" }}
         />
         <Legend
           layout="vertical"

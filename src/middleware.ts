@@ -43,9 +43,10 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Ignora arquivos estáticos, assets do Next e rotas de API (o NextAuth
-  // precisa responder /api/auth/** com JSON — se o middleware redirecionar
-  // essas chamadas para /login, o SessionProvider recebe HTML em vez de JSON
-  // e quebra com "Unexpected token '<'").
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)"],
+  // Ignora arquivos estáticos, assets do Next, rotas de API e os arquivos
+  // públicos do PWA (manifest.json, sw.js) — nenhum deles deve passar pela
+  // checagem de autenticação de página.
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons/|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)",
+  ],
 };

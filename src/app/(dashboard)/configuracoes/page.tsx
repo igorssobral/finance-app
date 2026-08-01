@@ -13,7 +13,6 @@ export const metadata = { title: "Configurações" };
 
 export default async function ConfiguracoesPage() {
   const session = await auth();
-  console.log("🚀 ~ ConfiguracoesPage ~ session:", session)
   if (!session?.user?.id) redirect("/login");
 
   const user = await prisma.user.findUnique({

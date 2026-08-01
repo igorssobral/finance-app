@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { signOut } from "next-auth/react";
 import { Search, Bell, Moon, Sun, LogOut, Settings, User } from "lucide-react";
@@ -25,6 +26,7 @@ interface TopbarProps {
 }
 
 export function Topbar({ user, unreadNotifications = 0 }: TopbarProps) {
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
@@ -97,15 +99,15 @@ export function Topbar({ user, unreadNotifications = 0 }: TopbarProps) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <a href="/configuracoes/perfil" className="flex items-center gap-2">
+            <DropdownMenuItem onSelect={() => router.push("/configuracoes/perfil")}>
+              <div className="flex items-center gap-2">
                 <User className="size-4" /> Perfil
-              </a>
+              </div>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a href="/configuracoes" className="flex items-center gap-2">
+            <DropdownMenuItem onSelect={() => router.push("/configuracoes")}>
+              <div className="flex items-center gap-2">
                 <Settings className="size-4" /> Configurações
-              </a>
+              </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

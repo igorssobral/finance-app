@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
-const PUBLIC_ROUTES = ["/login", "/registro", "/esqueci-senha", "/manifest.json"];
-const PUBLIC_PREFIXES = ["/api/auth", "/.well-known", "/icons"];
+const PUBLIC_ROUTES = ["/login", "/registro", "/esqueci-senha"];
 const ADMIN_ONLY_ROUTES = ["/configuracoes/usuarios", "/configuracoes/auditoria"];
 
 export default auth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
-  const isPublicRoute =
-    PUBLIC_ROUTES.some((route) => nextUrl.pathname === route || nextUrl.pathname.startsWith(route)) ||
-    PUBLIC_PREFIXES.some((prefix) => nextUrl.pathname.startsWith(prefix)) ||
-    ["/sw.js", "/favicon.ico"].includes(nextUrl.pathname);
+  const isPublicRoute = PUBLIC_ROUTES.some((route) =>
+    nextUrl.pathname.startsWith(route),
+  );
 
   // Não autenticado tentando acessar rota privada -> redireciona para login
   if (!isLoggedIn && !isPublicRoute) {
@@ -45,6 +43,9 @@ export default auth((req) => {
 });
 
 export const config = {
-  // Ignora arquivos estáticos, assets públicos e manifests do app
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:svg|png|jpg|jpeg|webp|ico|json|js|css|txt)$).*)"],
+  // Ignora arquivos estáticos, assets do Next e rotas de API (o NextAuth
+  // precisa responder /api/auth/** com JSON — se o middleware redirecionar
+  // essas chamadas para /login, o SessionProvider recebe HTML em vez de JSON
+  // e quebra com "Unexpected token '<'").
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp)$).*)"],
 };

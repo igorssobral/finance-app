@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 
 /** Ícones disponíveis para seleção em Categorias, Contas e Cartões. */
-export const ICON_MAP: Record<string, LucideIcon> = {
+export const ICON_MAP = {
   utensils: Utensils,
   car: Car,
   "heart-pulse": HeartPulse,
@@ -56,12 +56,16 @@ export const ICON_MAP: Record<string, LucideIcon> = {
   baby: Baby,
   fuel: Fuel,
   wrench: Wrench,
-};
+} satisfies Record<string, LucideIcon>;
 
-export const ICON_OPTIONS = Object.keys(ICON_MAP);
+export const ICON_OPTIONS = Object.keys(ICON_MAP) as Array<keyof typeof ICON_MAP>;
 
 export function getIcon(name: string | null | undefined): LucideIcon {
-  return (name && ICON_MAP[name]) || Shapes;
+  if (!name) {
+    return Shapes;
+  }
+
+  return ICON_MAP[name as keyof typeof ICON_MAP] ?? Shapes;
 }
 
 /** Paleta curada de cores para categorias, contas e cartões (hex). */

@@ -174,6 +174,11 @@ export function TransactionsTable({ data, onEdit, onDelete }: TransactionsTableP
         <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
           {virtualItems.map((virtualRow) => {
             const row = rows[virtualRow.index];
+
+            if (!row) {
+              return null;
+            }
+
             return (
               <div
                 key={row.id}

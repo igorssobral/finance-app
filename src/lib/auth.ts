@@ -7,7 +7,6 @@ import { loginSchema } from "@/lib/validations/auth";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  skipCSRFCheck: process.env.NODE_ENV === "development",
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt", // stateless — necessário para o middleware validar em edge

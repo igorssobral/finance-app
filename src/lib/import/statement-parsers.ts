@@ -49,13 +49,14 @@ export function parseCsvFile(file: File): Promise<ParsedStatementRow[]> {
         const rows: ParsedStatementRow[] = [];
         for (const row of results.data) {
           const keys = Object.keys(row).reduce<Record<string, string>>((acc, k) => {
-            acc[k.toLowerCase().trim()] = row[k];
+            const value = row[k];
+            acc[k.toLowerCase().trim()] = value ?? "";
             return acc;
           }, {});
           const date = keys["data"] ?? keys["date"];
           const description = keys["descrição"] ?? keys["descricao"] ?? keys["description"] ?? "";
           const amount = keys["valor"] ?? keys["amount"];
-          if (!date || amount === undefined) continue;
+          if (!date || amount === undefined || amount === "") continue;
 
           const normalized = normalizeRow(date, description, amount);
           if (normalized) rows.push(normalized);
@@ -70,13 +71,27 @@ export function parseCsvFile(file: File): Promise<ParsedStatementRow[]> {
 export async function parseXlsxFile(file: File): Promise<ParsedStatementRow[]> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const firstSheetName = workbook.SheetNames[0];
+
+  if (!firstSheetName) {
+    return [];
+  }
+
+  const sheet = workbook.Sheets[firstSheetName];
+
+  if (!sheet) {
+    return [];
+  }
+
   const data = XLSX.utils.sheet_to_json<Record<string, string | number>>(sheet);
 
   const rows: ParsedStatementRow[] = [];
   for (const row of data) {
     const keys = Object.keys(row).reduce<Record<string, string | number>>((acc, k) => {
-      acc[k.toLowerCase().trim()] = row[k];
+      const value = row[k];
+      if (value !== undefined) {
+        acc[k.toLowerCase().trim()] = value;
+      }
       return acc;
     }, {});
     const date = keys["data"] ?? keys["date"];
@@ -107,7 +122,11 @@ export async function parseOfxFile(file: File): Promise<ParsedStatementRow[]> {
 
     if (!amountMatch || !dateMatch) continue;
 
-    const normalized = normalizeRow(dateMatch[1], memoMatch?.[1] ?? "Transação importada", amountMatch[1]);
+    const dateValue = dateMatch[1] ?? "";
+    const amountValue = amountMatch[1] ?? "";
+    const memoValue = memoMatch?.[1] ?? "Transação importada";
+
+    const normalized = normalizeRow(dateValue, memoValue, amountValue);
     if (normalized) rows.push(normalized);
   }
 

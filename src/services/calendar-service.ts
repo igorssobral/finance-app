@@ -54,7 +54,10 @@ export async function getCalendarMonth(userId: string, year: number, month: numb
 
   for (const t of transactions) {
     if (!isSameMonth(t.date, reference)) continue;
-    const day = days[getDate(t.date) - 1];
+    const dayIndex = getDate(t.date) - 1;
+    const day = days[dayIndex];
+    if (!day) continue;
+
     const amount = toNumber(t.amount);
     if (t.type === "INCOME") {
       day.totalIncome += amount;
@@ -68,17 +71,25 @@ export async function getCalendarMonth(userId: string, year: number, month: numb
   for (const card of cards) {
     if (card.dueDay > end.getDate()) continue;
     const day = days[card.dueDay - 1];
+    if (!day) continue;
+
     const cardTotal = cardInvoice.cards.find((c) => c.cardId === card.id)?.invoiceTotal ?? 0;
     day.events.push({ type: "card-due", label: `Fatura ${card.name}`, amount: cardTotal });
   }
 
   for (const sub of subscriptions) {
-    const day = days[getDate(sub.nextChargeDate) - 1];
+    const dayIndex = getDate(sub.nextChargeDate) - 1;
+    const day = days[dayIndex];
+    if (!day) continue;
+
     day.events.push({ type: "subscription", label: sub.name, amount: toNumber(sub.amount) });
   }
 
   for (const inv of investments) {
-    const day = days[getDate(inv.purchaseDate) - 1];
+    const dayIndex = getDate(inv.purchaseDate) - 1;
+    const day = days[dayIndex];
+    if (!day) continue;
+
     day.events.push({ type: "investment", label: inv.name, amount: toNumber(inv.investedAmount) });
   }
 

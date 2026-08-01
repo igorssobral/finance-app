@@ -1,4 +1,4 @@
-import { getAnthropicClient, AI_MODEL } from "@/lib/ai/anthropic-client";
+import { getGeminiClient, AI_MODEL } from "@/lib/ai/gemini-client";
 import { getTotalsByPeriod, getCategoryBreakdown } from "@/lib/repositories/transaction-repository";
 import { getCurrentBalance } from "@/lib/repositories/account-repository";
 import { subMonths, startOfMonth, endOfMonth } from "date-fns";
@@ -11,22 +11,16 @@ interface ParsedIntent {
 }
 
 /**
- * PASSO 1: pede ao Claude para extrair a intenção da pergunta em JSON estrito —
+ * PASSO 1: pede ao Gemini para extrair a intenção da pergunta em JSON estrito —
  * nunca deixamos o modelo responder com números direto, para não arriscar
  * alucinação de valores financeiros.
  */
 async function parseIntent(question: string): Promise<ParsedIntent> {
-  const anthropic = getAnthropicClient();
+  const ai = getGeminiClient();
 
-  const message = await anthropic.messages.create({
+  const response = await ai.models.generateContent({
     model: AI_MODEL,
-    max_tokens: 200,
-    system:
-      "Você extrai a intenção de perguntas financeiras. Responda APENAS com um JSON válido, sem markdown e sem texto extra.",
-    messages: [
-      {
-        role: "user",
-        content: `Pergunta: "${question}"
+    contents: `Pergunta: "${question}"
 
 Classifique em um dos tipos: "category_spending" (gasto em uma categoria específica), "total_income" (total de receitas), "total_expense" (total de despesas), "balance" (saldo atual), "unknown" (não é sobre finanças pessoais).
 
@@ -34,17 +28,18 @@ Se mencionar um período em meses, extraia o número (padrão: 1 se não mencion
 Se for "category_spending", extraia o nome da categoria mencionada.
 
 Responda no formato exato: {"type": "...", "category": "..." ou null, "months": <número>}`,
-      },
-    ],
+    config: {
+      systemInstruction:
+        "Você extrai a intenção de perguntas financeiras. Responda APENAS com um JSON válido, sem markdown e sem texto extra.",
+      responseMimeType: "application/json",
+    },
   });
 
-  const textBlock = message.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    return { type: "unknown", months: 1 };
-  }
+  const text = response.text;
+  if (!text) return { type: "unknown", months: 1 };
 
   try {
-    const parsed = JSON.parse(textBlock.text.trim());
+    const parsed = JSON.parse(text.trim());
     return {
       type: ["category_spending", "total_income", "total_expense", "balance"].includes(parsed.type)
         ? parsed.type
@@ -87,30 +82,25 @@ async function resolveIntentData(userId: string, intent: ParsedIntent) {
 }
 
 /**
- * PASSO 3: pede ao Claude para formular uma resposta natural em português,
- * mas fornecendo o número exato já calculado — instruído a não alterá-lo.
+ * PASSO 3: pede ao Gemini para formular uma resposta natural em português,
+ * mas fornecendo o número exato já calculado — instruído a nunca alterá-lo.
  */
 async function phraseAnswer(question: string, label: string, value: number, months: number): Promise<string> {
-  const anthropic = getAnthropicClient();
+  const ai = getGeminiClient();
 
-  const message = await anthropic.messages.create({
+  const response = await ai.models.generateContent({
     model: AI_MODEL,
-    max_tokens: 150,
-    system:
-      "Você é um assistente financeiro. Responda em português, em 1-2 frases curtas e diretas, usando EXATAMENTE o valor fornecido — nunca invente ou arredonde para outro número.",
-    messages: [
-      {
-        role: "user",
-        content: `Pergunta original: "${question}"
+    contents: `Pergunta original: "${question}"
 Dado calculado: ${label} = ${formatCurrency(value)} (referente a ${months} ${months === 1 ? "mês" : "meses"})
 
 Responda a pergunta usando esse valor exato.`,
-      },
-    ],
+    config: {
+      systemInstruction:
+        "Você é um assistente financeiro. Responda em português, em 1-2 frases curtas e diretas, usando EXATAMENTE o valor fornecido — nunca invente ou arredonde para outro número.",
+    },
   });
 
-  const textBlock = message.content.find((b) => b.type === "text");
-  return textBlock && textBlock.type === "text" ? textBlock.text.trim() : formatCurrency(value);
+  return response.text?.trim() || formatCurrency(value);
 }
 
 export async function answerFinancialQuestion(userId: string, question: string): Promise<string> {

@@ -1,4 +1,4 @@
-import { getAnthropicClient, AI_MODEL } from "@/lib/ai/anthropic-client";
+import { getGeminiClient, AI_MODEL } from "@/lib/ai/gemini-client";
 import { prisma } from "@/lib/prisma";
 
 export interface CategorySuggestion {
@@ -25,35 +25,30 @@ export async function suggestCategory(
     return { categoryId: null, categoryName: null, confidence: 0 };
   }
 
-  const anthropic = getAnthropicClient();
+  const ai = getGeminiClient();
   const categoryList = categories.map((c) => c.name).join(", ");
 
-  const message = await anthropic.messages.create({
+  const response = await ai.models.generateContent({
     model: AI_MODEL,
-    max_tokens: 200,
-    system:
-      "Você categoriza transações financeiras. Responda APENAS com um JSON válido, sem markdown e sem texto extra.",
-    messages: [
-      {
-        role: "user",
-        content: `Categorias disponíveis: ${categoryList}
+    contents: `Categorias disponíveis: ${categoryList}
 
 Transação:
 Título: ${input.title}
 Descrição: ${input.description ?? "(nenhuma)"}
 
 Responda no formato exato: {"category": "<nome exato de uma das categorias disponíveis, ou null se nenhuma fizer sentido>", "confidence": <número de 0 a 1>}`,
-      },
-    ],
+    config: {
+      systemInstruction:
+        "Você categoriza transações financeiras. Responda APENAS com um JSON válido, sem markdown e sem texto extra.",
+      responseMimeType: "application/json",
+    },
   });
 
-  const textBlock = message.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    return { categoryId: null, categoryName: null, confidence: 0 };
-  }
+  const text = response.text;
+  if (!text) return { categoryId: null, categoryName: null, confidence: 0 };
 
   try {
-    const parsed = JSON.parse(textBlock.text.trim());
+    const parsed = JSON.parse(text.trim());
     const match = categories.find((c) => c.name === parsed.category);
     if (!match) return { categoryId: null, categoryName: null, confidence: 0 };
 

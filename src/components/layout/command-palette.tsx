@@ -92,7 +92,7 @@ export function CommandPalette() {
           >
             <Command.Item
               value="Nova transação"
-              onSelect={() => go("/transacoes/novo")}
+              onSelect={() => go("/transacoes")}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm data-[selected=true]:bg-accent"
             >
               <ArrowLeftRight className="size-4" />
@@ -100,7 +100,7 @@ export function CommandPalette() {
             </Command.Item>
             <Command.Item
               value="Nova categoria"
-              onSelect={() => go("/categorias/novo")}
+              onSelect={() => go("/categorias")}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm data-[selected=true]:bg-accent"
             >
               <Shapes className="size-4" />
@@ -108,7 +108,7 @@ export function CommandPalette() {
             </Command.Item>
             <Command.Item
               value="Nova conta"
-              onSelect={() => go("/contas/novo")}
+              onSelect={() => go("/contas")}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm data-[selected=true]:bg-accent"
             >
               <Landmark className="size-4" />
@@ -116,7 +116,7 @@ export function CommandPalette() {
             </Command.Item>
             <Command.Item
               value="Novo cartão"
-              onSelect={() => go("/cartoes/novo")}
+              onSelect={() => go("/cartoes")}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm data-[selected=true]:bg-accent"
             >
               <CreditCard className="size-4" />
